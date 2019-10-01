@@ -23,7 +23,7 @@ class Goal:
 
 
 class Buffet:
-    def __init__(self, n=10, p=0.3, g=10, r=0.25, h=2, wf=2, nw=4):
+    def __init__(self, n=10, p=0.3, g=10, r=0.18, h=2.5, wf=2, nw=1.5):
         self.n = n   # Number of items on buffet
         self.p = p   # Probability of wanting each item
         self.g = g   # Granularity of grid
@@ -31,8 +31,9 @@ class Buffet:
         self.h = h   # Height of grid
         self.wf = wf  # How long it takes to get food relative to moving 1 step
         self.w = nw + n + 1  # Width of grid
-        self.goals = [Goal(x=nw+i, y=r, r=r, emoji=random.randint(1, 19)) for i in range(n)]  # TODO: don't hardcode
-        self.goals.append(Goal(x=self.w+10, y=h/2, r=10+2*r, emoji=None))
+        emojis = numpy.random.choice(19, size=n, replace=False)+1  # TODO: don't hardcode size
+        self.goals = [Goal(x=nw+i, y=r, r=r, emoji=e) for i, e in enumerate(emojis)]
+        self.goals.append(Goal(x=self.w+10, y=0, r=10+1, emoji=None))
 
         self.actors = []
         self.color_index = 0
@@ -51,19 +52,20 @@ class Buffet:
     def get_mask(self, actors):
         # Build a grid of all obstacles
         # This works as a distance function as well
-        grid = numpy.zeros((self.h*self.g, self.w*self.g))
+        grid = numpy.zeros((int(self.h*self.g), int(self.w*self.g)))
         border = int(numpy.ceil(self.r*self.g))
         for (i, j), _ in numpy.ndenumerate(grid):
             x, y = self.ij2xy(i, j)
-            for actor in actors:
-                # distance = ((actor.x - x)**2 + (actor.y - y)**2)**0.5
-                distance = max(abs(actor.x - x), abs(actor.y - y))
-                if distance <= 2*self.r:
-                    grid[i][j] += 1000
-                #else:
-                #    grid[i][j] += 1.0 * 2*self.r/distance
             if i < border or j < border or i + border >= self.h*self.g or j + border >= self.w*self.g:
                 grid[i][j] = float('inf')
+        for a in actors:
+            for (i, j), _ in numpy.ndenumerate(grid):
+                x, y = self.ij2xy(i, j)
+                # distance = ((a.x - x)**2 + (a.y - y)**2)**0.5  # circular actors
+                distance = max(abs(a.x - x), abs(a.y - y))  # square actors
+                if distance < 2*self.r:
+                    grid[i][j] += 1000*(1 + (self.h - y)/self.h)  # TODO: explain
+
         return grid
 
     def move_actor(self, a):
@@ -85,7 +87,6 @@ class Buffet:
 
         # 9 directions
         dirs = [(0, 0), (1, 0), (0, 1), (-1, 0), (0, -1), (1, 1), (1, -1), (-1, -1), (-1, 1)]
-        dirs = [(0, 0), (1, 0), (-1, 0), (0, -1), (1, -1), (-1, -1)]
 
         def heuristic(i1, j1, i2, j2):
             return max(abs(i1-i2), abs(j1-j2))
@@ -96,13 +97,14 @@ class Buffet:
         ai, aj = self.xy2ij(a.x, a.y)
         for (i, j), _ in numpy.ndenumerate(grid):
             x, y = self.ij2xy(i, j)
-            if (x - g.x)**2 + (y - g.y)**2 < g.r**2:
-                if numpy.isfinite(grid[i][j]):
+            if numpy.isfinite(grid[i][j]):
+                if (x - g.x)**2 + (y - g.y)**2 < g.r**2:
                     fg, fh = 0, heuristic(i, j, ai, aj)
                     heapq.heappush(q, (fg+fh, fg, fh, i, j, None, None))
 
         fgs = numpy.ones(grid.shape) * float('inf')
         visited = set()
+        i_to, j_to = None, None
         while q:
             ff, fg, fh, i, j, i_to, j_to = heapq.heappop(q)
             if (i, j) in visited:
@@ -112,12 +114,20 @@ class Buffet:
                 break
             visited.add((i, j))
             fgs[i][j] = fg
+            x, y = self.ij2xy(i, j)
             for di, dj in dirs:
                 i2, j2 = i+di, j+dj
-                fg2 = fg + (di**2 + dj**2)**0.1 + grid[i2][j2]  # mild penalization of diagonal moves
+                step_size = ((di**2 + dj**2)**0.1 +  # mild penalization of diagonal moves
+                             + grid[i2][j2])  # last term just penalizes going through other people
+                if (x - g.x)**2 < g.r**2 and di == 1 and dj == 0:
+                    step_size *= 1e-3  # prioritize getting the vertical alignment with the goal
+                fg2 = fg + step_size
                 if numpy.isfinite(grid[i2][j2]):
                     fh2 = heuristic(i2, j2, ai, aj)
                     heapq.heappush(q, (fg2+fh2, fg2, fh2, i2, j2, i, j))
+
+        if i_to is None:
+            print('stuck!!! next goal is', next_goal)
 
         if i_to is not None and j_to is not None and grid[i_to][j_to] < 1000 and numpy.isfinite(fgs[i_to][j_to]):
             print('go from', i, j, 'to', i_to, j_to)
@@ -129,7 +139,9 @@ class Buffet:
         x = y = self.r
         i, j = self.xy2ij(x, y)
         if mask[i][j] < 1000:  # Empty so spawn new
-            goals = {g: self.g*self.wf for g in range(1, self.n+1) if random.random() < self.p}
+            goals = {}
+            while len(goals) == 0:
+                goals = {g: self.g*self.wf for g in range(self.n) if random.random() < self.p}
             goals[self.n] = 1  # sentinel
             print(goals)
             a = Actor(x, y, goals, random.randint(1, 55))  # todo: don't hardcode

@@ -1,3 +1,4 @@
+import argparse
 import heapq
 import multiprocessing
 import numpy
@@ -12,6 +13,8 @@ class Actor:
         self.goals = goals
         self.emoji = emoji
         self.loading_left = None
+        self.path = []
+        self.path_color = tuple(0xe0 + int(0x20*random.random()) for z in range(3))
 
 
 class Goal:
@@ -23,7 +26,7 @@ class Goal:
 
 
 class Buffet:
-    def __init__(self, n=10, p=0.3, g=10, r=0.18, h=2.5, wf=2, nw=1.5):
+    def __init__(self, n=10, p=0.3, g=10, r=0.25, h=5, wf=2, nw=1.5, rate=1.0):
         self.n = n   # Number of items on buffet
         self.p = p   # Probability of wanting each item
         self.g = g   # Granularity of grid
@@ -31,6 +34,7 @@ class Buffet:
         self.h = h   # Height of grid
         self.wf = wf  # How long it takes to get food relative to moving 1 step
         self.w = nw + n + 1  # Width of grid
+        self.rate = rate  # Rate of spawning new actors
         emojis = numpy.random.choice(19, size=n, replace=False)+1  # TODO: don't hardcode size
         self.goals = [Goal(x=nw+i, y=r, r=r, emoji=e) for i, e in enumerate(emojis)]
         self.goals.append(Goal(x=self.w+10, y=0, r=10+1, emoji=None))
@@ -100,15 +104,18 @@ class Buffet:
             if numpy.isfinite(grid[i][j]):
                 if (x - g.x)**2 + (y - g.y)**2 < g.r**2:
                     fg, fh = 0, heuristic(i, j, ai, aj)
-                    heapq.heappush(q, (fg+fh, fg, fh, i, j, None, None))
+                    heapq.heappush(q, (fg+fh, fg, fh, i, j, -1, -1))
 
         fgs = numpy.ones(grid.shape) * float('inf')
         visited = set()
-        i_to, j_to = None, None
+        i_to_matrix = numpy.ones(grid.shape, dtype=int) * -1
+        j_to_matrix = numpy.ones(grid.shape, dtype=int) * -1
         while q:
             ff, fg, fh, i, j, i_to, j_to = heapq.heappop(q)
             if (i, j) in visited:
                 continue
+            i_to_matrix[i][j] = i_to
+            j_to_matrix[i][j] = j_to
             if i == ai and j == aj:
                 print(ff, fg, fh, i, j, i_to, j_to)
                 break
@@ -117,7 +124,7 @@ class Buffet:
             x, y = self.ij2xy(i, j)
             for di, dj in dirs:
                 i2, j2 = i+di, j+dj
-                step_size = ((di**2 + dj**2)**0.1 +  # mild penalization of diagonal moves
+                step_size = ((di**2 + dj**2)**0.5 +  # penalization of diagonal moves
                              + grid[i2][j2])  # last term just penalizes going through other people
                 if (x - g.x)**2 < g.r**2 and di == 1 and dj == 0:
                     step_size *= 1e-3  # prioritize getting the vertical alignment with the goal
@@ -126,24 +133,30 @@ class Buffet:
                     fh2 = heuristic(i2, j2, ai, aj)
                     heapq.heappush(q, (fg2+fh2, fg2, fh2, i2, j2, i, j))
 
-        if i_to is None:
+        if i_to is -1:
             print('stuck!!! next goal is', next_goal)
 
-        if i_to is not None and j_to is not None and grid[i_to][j_to] < 1000 and numpy.isfinite(fgs[i_to][j_to]):
+        if i_to != -1 and j_to != -1 and grid[i_to][j_to] < 1000 and numpy.isfinite(fgs[i_to][j_to]):
             print('go from', i, j, 'to', i_to, j_to)
             a.x, a.y = self.ij2xy(i_to, j_to)
 
+        # Reconstruct the shortest path
+        a.path = []
+        while (i, j) != (-1, -1):
+            a.path.append(self.ij2xy(i, j))
+            i, j = i_to_matrix[i][j], j_to_matrix[i][j]
+
     def step(self):
-        # Spawn new actor if the top left corner is empty
-        mask = self.get_mask(self.actors)
-        x = y = self.r
-        i, j = self.xy2ij(x, y)
-        if mask[i][j] < 1000:  # Empty so spawn new
+        # Spawn new actor randomly
+        if random.random() < self.rate / self.g:
+            mask = self.get_mask(self.actors)
+            # Find the most top left position that's available
+            j, i = min((j, i) for (i, j), v in numpy.ndenumerate(mask) if v < 1000)
             goals = {}
             while len(goals) == 0:
                 goals = {g: self.g*self.wf for g in range(self.n) if random.random() < self.p}
             goals[self.n] = 1  # sentinel
-            print(goals)
+            x, y = self.ij2xy(i, j)
             a = Actor(x, y, goals, random.randint(1, 55))  # todo: don't hardcode
             self.actors.append(a)
 
@@ -172,29 +185,21 @@ def draw_frame(buffet, fn, up_f=200, down_f=4):
               'Time: %.1fs Finished: %.0f Rate: %.2f/s' % (buffet.time, buffet.finished, buffet.finished/buffet.time),
               fill=(0x66, 0x66, 0x66), font=font)
     for a in buffet.actors:
-        next_goal = min(a.goals.keys())
-        g = buffet.goals[next_goal]
-        draw.line((a.x*up_f, a.y*up_f, g.x*up_f, g.y*up_f),
-                  fill=(0xf3, 0xf3, 0xf3), width=2*down_f)
+        for j in range(len(a.path)-1):
+            draw.line((a.path[j][0]*up_f, a.path[j][1]*up_f, a.path[j+1][0]*up_f, a.path[j+1][1]*up_f),
+                      fill=a.path_color, width=2*down_f)
     for g in buffet.goals:
-        #draw.ellipse(((g.x - g.r)*up_f, (g.y - g.r)*up_f,
-        #              (g.x + g.r)*up_f, (g.y + g.r)*up_f),
-        #             outline=(240, 240, 240), width=2*down_f, fill=(255, 0, 0))
         if g.emoji:
             emoji = PIL.Image.open('pics/food/%d.png' % g.emoji)
             emoji = emoji.resize((int(2*g.r*up_f), int(2*g.r*up_f)))
             im.alpha_composite(emoji, (int((g.x-g.r)*up_f),
                                        int((g.y-g.r)*up_f)))
     for a in buffet.actors:
-        #draw.ellipse(((a.x - buffet.r)*up_f, (a.y - buffet.r)*up_f,
-        #              (a.x + buffet.r)*up_f, (a.y + buffet.r)*up_f),
-        #             fill=(255, 200, 200))
         emoji = PIL.Image.open('pics/people/%d.png' % a.emoji)
         emoji = emoji.resize((int(2*buffet.r*up_f), int(2*buffet.r*up_f)))
         im.alpha_composite(emoji, (int((a.x-buffet.r)*up_f),
                                    int((a.y-buffet.r)*up_f)))
         if a.loading_left:
-            print(360*a.loading_left/(buffet.g*buffet.wf), 'degrees')
             draw.arc(((a.x - buffet.r)*up_f, (a.y - buffet.r)*up_f,
                       (a.x + buffet.r)*up_f, (a.y + buffet.r)*up_f),
                      start=0, end=360*a.loading_left/(buffet.g*buffet.wf),
@@ -205,10 +210,17 @@ def draw_frame(buffet, fn, up_f=200, down_f=4):
 
 
 if __name__ == '__main__':
-    b = Buffet()
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--rate', type=float, default=1.0)
+    parser.add_argument('--draw', action='store_true')
+    # todo: add more arguments
+    args = parser.parse_args()
+
+    b = Buffet(rate=args.rate)
     pool = multiprocessing.Pool(10)
     frame = 0
     while True:
         b.step()
-        pool.apply(draw_frame, (b, 'frames/%06d.png' % frame))
+        if args.draw:
+            pool.apply(draw_frame, (b, 'frames/%06d.png' % frame))
         frame += 1

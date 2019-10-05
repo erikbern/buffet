@@ -2,8 +2,17 @@ import argparse
 import heapq
 import multiprocessing
 import numpy
+import os
 import random
 import PIL.Image, PIL.ImageDraw, PIL.ImageFont
+
+
+def listdir(d):
+    return [os.path.join(d, p) for p in os.listdir(d)]
+
+
+FOODS = listdir('pics/food')
+PEOPLE = listdir('pics/people')
 
 
 class Actor:
@@ -27,7 +36,7 @@ class Goal:
 
 
 class Buffet:
-    def __init__(self, n=7, p=0.4, g=10, r=0.18, gr=0.24, h=4, wf=2, nw=3.0, rate=1.0, method='anarchy'):
+    def __init__(self, n=10, p=0.4, g=10, r=0.18, gr=0.24, h=4, wf=2, nw=4.5, rate=1.0, method='anarchy'):
         self.n = n   # Number of items on buffet
         self.p = p   # Probability of wanting each item
         self.g = g   # Granularity of grid
@@ -37,7 +46,7 @@ class Buffet:
         self.w = nw + n + 1  # Width of grid
         self.rate = rate  # Rate of spawning new actors
         self.method = method
-        emojis = numpy.random.choice(19, size=n, replace=False)+1  # TODO: don't hardcode size
+        emojis = random.sample(FOODS, n)
         self.goals = [Goal(x=nw+i, y=gr, r=gr, emoji=e) for i, e in enumerate(emojis)]
         self.goals.append(Goal(x=self.w+10, y=0, r=10+1, emoji=None))
 
@@ -136,14 +145,14 @@ class Buffet:
                 i2, j2 = i+di, j+dj
                 step_size = ((di**2 + dj**2)**0.5 +  # penalization of diagonal moves
                              + grid[i2][j2])  # last term just penalizes going through other people
-                if self.method == 'vline':
-                    if abs(x - g.x) < self.r and di == 1 and dj == 0:
+                if self.method in ['vline']:
+                    if abs(x - g.x) <= self.r and di == 1 and dj == 0:
                         # prioritize getting the vertical alignment with the goal
-                        step_size *= 1e-3
-                elif self.method == 'skippable':
-                    if abs(y - g.y) < self.r and di == j and dj == 1:
+                        step_size *= 1e-6
+                elif self.method in ['skippable', 'classic']:
+                    if abs(y - g.y) <= self.r and di == 0 and dj == -1:
                         # prioritize getting the horizontal alignment with the goal
-                        step_size *= 1e-3
+                        step_size *= 1e-6
                 fg2 = fg + step_size
                 if numpy.isfinite(grid[i2][j2]):
                     fh2 = heuristic(i2, j2, ai, aj)
@@ -178,7 +187,7 @@ class Buffet:
                 goals = {g: self.g*self.wf for g in range(self.n) if random.random() < self.p}
             goals[self.n] = 1  # sentinel
             x, y = self.ij2xy(i, j)
-            a = Actor(x, y, goals, random.randint(1, 55))  # todo: don't hardcode
+            a = Actor(x, y, goals, random.choice(PEOPLE))
             self.actors.append(a)
 
         # Move each actor
@@ -198,9 +207,9 @@ def draw_frame(buffet, fn, simple):
     # Pillow (at least whatever version I have) seems to segfault occasionally
     # That's why we run it inside a pool
     if simple:
-        up_f, down_f = 200, 4
+        up_f, down_f = 128, 4
     else:
-        up_f, down_f = 200, 2
+        up_f, down_f = 128, 2
 
     im = PIL.Image.new('RGBA', (int(buffet.w*up_f), int(buffet.h*up_f)), (255, 255, 255))
     draw = PIL.ImageDraw.Draw(im)
@@ -217,24 +226,24 @@ def draw_frame(buffet, fn, simple):
                   fill=(0x66, 0x66, 0x66), font=font)
     for g in buffet.goals:
         if g.emoji:
-            emoji = PIL.Image.open('pics/food/%d.png' % g.emoji)
+            emoji = PIL.Image.open(g.emoji)
             emoji = emoji.resize((int(2*g.r*up_f), int(2*g.r*up_f)))
             im.alpha_composite(emoji, (int((g.x-g.r)*up_f),
                                        int((g.y-g.r)*up_f)))
     for a in buffet.actors:
-        emoji = PIL.Image.open('pics/people/%d.png' % a.emoji)
+        emoji = PIL.Image.open(a.emoji)
         emoji = emoji.resize((int(2*buffet.r*up_f), int(2*buffet.r*up_f)))
         im.alpha_composite(emoji, (int((a.x-buffet.r)*up_f),
                                    int((a.y-buffet.r)*up_f)))
         plate = PIL.Image.open('pics/plate.png')
-        minis = [('pics/plate.png', -buffet.r, 0)] + [('pics/food/%d.png' % buffet.goals[r].emoji, -buffet.r, 0) for r in a.reached]
+        minis = [('pics/plate.png', -buffet.r, 0)] + [(buffet.goals[r].emoji, -buffet.r, 0) for r in a.reached]
         if a.loading_left:
             #draw.arc(((a.x - buffet.r)*up_f, (a.y - buffet.r)*up_f,
             #          (a.x + buffet.r)*up_f, (a.y + buffet.r)*up_f),
             #         start=0, end=360*a.loading_left/(buffet.g*buffet.wf),
             #         fill=(0, 0, 0), width=2*down_f)
             frac = a.loading_left / (buffet.g*buffet.wf)
-            path = 'pics/food/%d.png' % buffet.goals[min(a.goals.keys())].emoji
+            path = buffet.goals[min(a.goals.keys())].emoji
             minis.append(((path, -buffet.r*(1-frac), -buffet.r*frac)))
         for path, dx, dy in minis:
             mini = PIL.Image.open(path)
@@ -261,9 +270,10 @@ if __name__ == '__main__':
 
     b = Buffet(rate=args.rate, method=args.method)
     pool = multiprocessing.Pool(10)
-    frame = 0
+    step = 0
     while True:
+        print('###### step', step)
         b.step()
         if args.draw:
-            pool.apply(draw_frame, (b, 'frames/%06d.png' % frame, args.simple))
-        frame += 1
+            pool.apply(draw_frame, (b, 'frames/%06d.png' % step, args.simple))
+        step += 1

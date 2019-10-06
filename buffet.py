@@ -1,6 +1,4 @@
-import argparse
 import heapq
-import multiprocessing
 import numpy
 import os
 import random
@@ -19,7 +17,9 @@ PREFERENCE_FACTOR = 1e-6
 
 
 class Actor:
-    def __init__(self, x, y, r, goals, emoji):
+    def __init__(self, created_at, x, y, r, goals, emoji):
+        self.created_at = created_at
+        self.finished_at = None
         self.x = x
         self.y = y
         self.r = r
@@ -87,7 +87,8 @@ class Buffet:
         self.goals = [Goal(x=nw+i, y=gr, r=gr, emoji=e) for i, e in enumerate(emojis)]
         self.goals.append(Goal(x=self.w+10, y=0, r=10+1, emoji=None))
 
-        self.actors = []
+        self.active_actors = []
+        self.all_actors = []
         self.color_index = 0
 
         self.time = 0
@@ -103,7 +104,6 @@ class Buffet:
 
     def get_mask(self, actors):
         # Build a grid of all obstacles
-        # This works as a distance function as well
         grid = numpy.zeros((int(self.h*self.g), int(self.w*self.g)))
         border = int(numpy.ceil(self.r*self.g))
         for (i, j), _ in numpy.ndenumerate(grid):
@@ -122,7 +122,7 @@ class Buffet:
 
     def move_actor(self, a):
         # Generate a mask of pixels 
-        grid = self.get_mask([actor for actor in self.actors if actor != a])
+        grid = self.get_mask([actor for actor in self.active_actors if actor != a])
 
         # What's the next goal for this actor?
         next_goal = min(a.goals.keys())
@@ -192,7 +192,7 @@ class Buffet:
     def step(self):
         # Spawn new actor randomly
         if random.random() < self.rate / self.g:
-            mask = self.get_mask(self.actors)
+            mask = self.get_mask(self.active_actors)
             # Find the most top left position that's available
             j, i = min((j, i) for (i, j), v in numpy.ndenumerate(mask) if v < ACTOR_BLOCKAGE_FACTOR)
             print('spawning at', i, j)
@@ -202,20 +202,24 @@ class Buffet:
             goals[self.n] = 1  # sentinel
             x, y = self.ij2xy(i, j)
             cls = {'classic': ClassicActor, 'rogue': RogueActor, 'vline': VLineActor}[self.method]
-            a = cls(x, y, self.r, goals, random.choice(PEOPLE))
-            self.actors.append(a)
+            a = cls(self.time, x, y, self.r, goals, random.choice(PEOPLE))
+            self.active_actors.append(a)
+            self.all_actors.append(a)
 
         # Move each actor
         keep_actors = []
-        for a in self.actors:
+        for a in self.active_actors:
             self.move_actor(a)
             if a.goals:
                 keep_actors.append(a)
             else:
+                a.finished_at = self.time
                 self.finished += 1
         random.shuffle(keep_actors)
-        self.actors = keep_actors
+        self.active_actors = keep_actors
+        data = [(a.created_at, a.finished_at, self.time) for a in self.all_actors]
         self.time += 1.0/self.g
+        return data
 
 
 def draw_frame(buffet, fn, simple):
@@ -230,7 +234,7 @@ def draw_frame(buffet, fn, simple):
     draw = PIL.ImageDraw.Draw(im)
 
     if not simple:
-        for a in buffet.actors:
+        for a in buffet.active_actors:
             for j in range(len(a.path)-1):
                 draw.line((a.path[j][0]*up_f, a.path[j][1]*up_f, a.path[j+1][0]*up_f, a.path[j+1][1]*up_f),
                           fill=a.path_color, width=2*down_f)
@@ -245,7 +249,7 @@ def draw_frame(buffet, fn, simple):
             emoji = emoji.resize((int(2*g.r*up_f), int(2*g.r*up_f)))
             im.alpha_composite(emoji, (int((g.x-g.r)*up_f),
                                        int((g.y-g.r)*up_f)))
-    for a in buffet.actors:
+    for a in buffet.active_actors:
         emoji = PIL.Image.open(a.emoji)
         emoji = emoji.resize((int(2*buffet.r*up_f), int(2*buffet.r*up_f)))
         im.alpha_composite(emoji, (int((a.x-buffet.r)*up_f),
@@ -272,23 +276,3 @@ def draw_frame(buffet, fn, simple):
     # Crop out the rightmost part where actors exit
     im = im.crop((0, 0, int((buffet.goals[-1].x - buffet.goals[-1].r)*up_f/down_f), int(buffet.h*up_f/down_f)))
     im.save(fn)
-
-
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--rate', type=float, default=1.0)
-    parser.add_argument('--draw', action='store_true')
-    parser.add_argument('--simple', action='store_true')  # draw less, for gif
-    parser.add_argument('--method', choices=['classic', 'skippable', 'vline', 'anarchy'])
-    # todo: add more arguments
-    args = parser.parse_args()
-
-    b = Buffet(rate=args.rate, method=args.method)
-    pool = multiprocessing.Pool(10)
-    step = 0
-    while True:
-        print('###### step', step)
-        b.step()
-        if args.draw:
-            pool.apply(draw_frame, (b, 'frames/%06d.png' % step, args.simple))
-        step += 1

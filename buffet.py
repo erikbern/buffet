@@ -46,8 +46,8 @@ class ClassicActor(Actor):
     def cost_factor(self, x, y, g, di, dj):
         if abs(y - g.y) <= self.r and di == 0 and dj == -1:
             return PREFERENCE_FACTOR  # prioritize getting the horizontal alignment with the goal
-        elif di == 1:
-            return PREFERENCE_FACTOR  # always go up if possible
+        elif di == 1 and dj == 0:
+            return PREFERENCE_FACTOR  # go up if possible
         else:
             return 1.0
 
@@ -58,8 +58,7 @@ class VLineActor(Actor):
 
     def cost_factor(self, x, y, g, di, dj):
         if abs(x - g.x) <= self.r and di == 1 and dj == 0:
-            # prioritize getting the vertical alignment with the goal
-            return PREFERENCE_FACTOR
+            return PREFERENCE_FACTOR  # prioritize getting the vertical alignment with the goal
         else:
             return 1.0
 

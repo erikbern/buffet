@@ -9,7 +9,7 @@ if __name__ == '__main__':
     parser.add_argument('--rate', type=float, default=1.0)
     parser.add_argument('--draw', action='store_true')
     parser.add_argument('--simple', action='store_true')  # draw less, for gif
-    parser.add_argument('--method', choices=['classic', 'vline', 'rogue'], required=True)
+    parser.add_argument('--method', choices=['classic', 'vline', 'rogue', 'skippable'], required=True)
     parser.add_argument('--output', default='buffet.json')
     # todo: add more arguments
     args = parser.parse_args()

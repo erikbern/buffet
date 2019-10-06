@@ -52,6 +52,14 @@ class ClassicActor(Actor):
             return 1.0
 
 
+class SkippableActor(Actor):
+    def dirs(self):
+        return [(0, 0), (0, -1), (1, -1), (1, 0), (-1, -1), (-1, 0)]
+
+    def cost_factor(self, x, y, g, di, dj):
+        return 1.0
+
+
 class VLineActor(Actor):
     def dirs(self):
         return [(0, 0), (1, 0), (0, -1), (-1, 0), (1, -1), (-1, -1)]
@@ -200,7 +208,7 @@ class Buffet:
                 goals = {g: self.g*self.wf for g in range(self.n) if random.random() < self.p}
             goals[self.n] = 1  # sentinel
             x, y = self.ij2xy(i, j)
-            cls = {'classic': ClassicActor, 'rogue': RogueActor, 'vline': VLineActor}[self.method]
+            cls = {'classic': ClassicActor, 'skippable': SkippableActor, 'rogue': RogueActor, 'vline': VLineActor}[self.method]
             a = cls(self.time, x, y, self.r, goals, random.choice(PEOPLE))
             self.active_actors.append(a)
             self.all_actors.append(a)

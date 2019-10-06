@@ -16,15 +16,49 @@ PEOPLE = listdir('pics/people')
 
 
 class Actor:
-    def __init__(self, x, y, goals, emoji):
+    def __init__(self, x, y, r, goals, emoji):
         self.x = x
         self.y = y
+        self.r = r
         self.goals = goals
         self.emoji = emoji
         self.loading_left = None
         self.path = []
         self.path_color = tuple(0xe0 + int(0x20*random.random()) for z in range(3))
         self.reached = []
+
+
+class RogueActor(Actor):
+    def dirs(self):
+        return [(0, 0), (1, 0), (0, 1), (-1, 0), (0, -1), (1, 1), (1, -1), (-1, -1), (-1, 1)]
+
+    def cost_factor(self, x, y, g, di, dj):
+        return 1.0
+
+
+class ClassicActor(Actor):
+    def dirs(self):
+        return [(0, 0), (0, -1), (1, -1), (1, 0)]
+
+    def cost_factor(self, x, y, g, di, dj):
+        if abs(y - g.y) <= self.r and di == 0 and dj == -1:
+            return 1e-6  # prioritize getting the horizontal alignment with the goal
+        elif di == 1:
+            return 1e-6  # always go up if possible
+        else:
+            return 1.0
+
+
+class VLineActor(Actor):
+    def dirs(self):
+        return [(0, 0), (1, 0), (0, -1), (-1, 0), (1, -1), (-1, -1)]
+
+    def cost_factor(self, x, y, g, di, dj):
+        if abs(x - g.x) <= self.r and di == 1 and dj == 0:
+            # prioritize getting the vertical alignment with the goal
+            return 1e-6
+        else:
+            return 1.0
 
 
 class Goal:
@@ -102,13 +136,7 @@ class Buffet:
                 a.goals.pop(next_goal)
                 a.reached.append(next_goal)
 
-        if self.method in ['anarchy']:
-            # 9 directions
-            dirs = [(0, 0), (1, 0), (0, 1), (-1, 0), (0, -1), (1, 1), (1, -1), (-1, -1), (-1, 1)]
-        elif self.method in ['classic']:
-            dirs = [(0, 0), (0, -1), (1, -1), (1, 0)]
-        elif self.method in ['vline', 'skippable']:
-            dirs = [(0, 0), (1, 0), (0, -1), (-1, 0), (1, -1), (-1, -1)]
+        dirs = a.dirs()
 
         def heuristic(i1, j1, i2, j2):
             return max(abs(i1-i2), abs(j1-j2))
@@ -144,15 +172,8 @@ class Buffet:
             for di, dj in dirs:
                 i2, j2 = i+di, j+dj
                 step_size = ((di**2 + dj**2)**0.5 +  # penalization of diagonal moves
-                             + grid[i2][j2])  # last term just penalizes going through other people
-                if self.method in ['vline']:
-                    if abs(x - g.x) <= self.r and di == 1 and dj == 0:
-                        # prioritize getting the vertical alignment with the goal
-                        step_size *= 1e-6
-                elif self.method in ['skippable', 'classic']:
-                    if abs(y - g.y) <= self.r and di == 0 and dj == -1:
-                        # prioritize getting the horizontal alignment with the goal
-                        step_size *= 1e-6
+                             grid[i2][j2])  # last term just penalizes going through other people
+                step_size *= a.cost_factor(x, y, g, di, dj)
                 fg2 = fg + step_size
                 if numpy.isfinite(grid[i2][j2]):
                     fh2 = heuristic(i2, j2, ai, aj)
@@ -187,7 +208,8 @@ class Buffet:
                 goals = {g: self.g*self.wf for g in range(self.n) if random.random() < self.p}
             goals[self.n] = 1  # sentinel
             x, y = self.ij2xy(i, j)
-            a = Actor(x, y, goals, random.choice(PEOPLE))
+            cls = {'classic': ClassicActor, 'rogue': RogueActor, 'vline': VLineActor}[self.method]
+            a = cls(x, y, self.r, goals, random.choice(PEOPLE))
             self.actors.append(a)
 
         # Move each actor
@@ -207,9 +229,9 @@ def draw_frame(buffet, fn, simple):
     # Pillow (at least whatever version I have) seems to segfault occasionally
     # That's why we run it inside a pool
     if simple:
-        up_f, down_f = 128, 4
+        up_f, down_f = 256, 4
     else:
-        up_f, down_f = 128, 2
+        up_f, down_f = 256, 2
 
     im = PIL.Image.new('RGBA', (int(buffet.w*up_f), int(buffet.h*up_f)), (255, 255, 255))
     draw = PIL.ImageDraw.Draw(im)

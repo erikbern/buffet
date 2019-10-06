@@ -14,6 +14,9 @@ def listdir(d):
 FOODS = listdir('pics/food')
 PEOPLE = listdir('pics/people')
 
+ACTOR_BLOCKAGE_FACTOR = 1e3
+PREFERENCE_FACTOR = 1e-6
+
 
 class Actor:
     def __init__(self, x, y, r, goals, emoji):
@@ -42,9 +45,9 @@ class ClassicActor(Actor):
 
     def cost_factor(self, x, y, g, di, dj):
         if abs(y - g.y) <= self.r and di == 0 and dj == -1:
-            return 1e-6  # prioritize getting the horizontal alignment with the goal
+            return PREFERENCE_FACTOR  # prioritize getting the horizontal alignment with the goal
         elif di == 1:
-            return 1e-6  # always go up if possible
+            return PREFERENCE_FACTOR  # always go up if possible
         else:
             return 1.0
 
@@ -56,7 +59,7 @@ class VLineActor(Actor):
     def cost_factor(self, x, y, g, di, dj):
         if abs(x - g.x) <= self.r and di == 1 and dj == 0:
             # prioritize getting the vertical alignment with the goal
-            return 1e-6
+            return PREFERENCE_FACTOR
         else:
             return 1.0
 
@@ -113,7 +116,7 @@ class Buffet:
                 # distance = ((a.x - x)**2 + (a.y - y)**2)**0.5  # circular actors
                 distance = max(abs(a.x - x), abs(a.y - y))  # square actors
                 if distance < 2*self.r:
-                    grid[i][j] += 1000*(1 + (self.h - y)/self.h)  # TODO: explain
+                    grid[i][j] += ACTOR_BLOCKAGE_FACTOR*(1 + (self.h - y)/self.h)  # TODO: explain
 
         return grid
 
@@ -138,10 +141,7 @@ class Buffet:
 
         dirs = a.dirs()
 
-        def heuristic(i1, j1, i2, j2):
-            return max(abs(i1-i2), abs(j1-j2))
-
-        # Use A* search algorithm
+        # Use Dijkstra
         # Seed starting points
         q = []
         ai, aj = self.xy2ij(a.x, a.y)
@@ -150,41 +150,36 @@ class Buffet:
             if numpy.isfinite(grid[i][j]):
                 # if (x - g.x)**2 + (y - g.y)**2 < g.r**2:
                 if max(abs(x - g.x), abs(y - g.y)) < g.r:  # square goals
-                    fg, fh = 0, heuristic(i, j, ai, aj)
-                    heapq.heappush(q, (fg+fh, fg, fh, i, j, -1, -1))
+                    heapq.heappush(q, (0, i, j, -1, -1))
 
-        fgs = numpy.ones(grid.shape) * float('inf')
         visited = set()
         i_to_matrix = numpy.ones(grid.shape, dtype=int) * -1
         j_to_matrix = numpy.ones(grid.shape, dtype=int) * -1
         while q:
-            ff, fg, fh, i, j, i_to, j_to = heapq.heappop(q)
+            distance, i, j, i_to, j_to = heapq.heappop(q)
             if (i, j) in visited:
                 continue
             i_to_matrix[i][j] = i_to
             j_to_matrix[i][j] = j_to
             if i == ai and j == aj:
-                print(ff, fg, fh, i, j, i_to, j_to)
+                print(distance, i, j, i_to, j_to)
                 break
             visited.add((i, j))
-            fgs[i][j] = fg
             x, y = self.ij2xy(i, j)
             for di, dj in dirs:
                 i2, j2 = i+di, j+dj
                 step_size = ((di**2 + dj**2)**0.5 +  # penalization of diagonal moves
                              grid[i2][j2])  # last term just penalizes going through other people
                 step_size *= a.cost_factor(x, y, g, di, dj)
-                fg2 = fg + step_size
                 if numpy.isfinite(grid[i2][j2]):
-                    fh2 = heuristic(i2, j2, ai, aj)
-                    heapq.heappush(q, (fg2+fh2, fg2, fh2, i2, j2, i, j))
+                    heapq.heappush(q, (distance + step_size, i2, j2, i, j))
         else:
             i, j, i_to, j_to = -1, -1, -1, -1
 
         if i_to is -1:
             print('stuck!!! next goal is', next_goal)
 
-        if i_to != -1 and j_to != -1 and grid[i_to][j_to] < 1000 and numpy.isfinite(fgs[i_to][j_to]):
+        if i_to != -1 and j_to != -1 and grid[i_to][j_to] < ACTOR_BLOCKAGE_FACTOR:
             print('go from', i, j, 'to', i_to, j_to)
             a.x, a.y = self.ij2xy(i_to, j_to)
 
@@ -199,10 +194,8 @@ class Buffet:
         if random.random() < self.rate / self.g:
             mask = self.get_mask(self.actors)
             # Find the most top left position that's available
-            j, i = min((j, i) for (i, j), v in numpy.ndenumerate(mask) if v < 1000)
+            j, i = min((j, i) for (i, j), v in numpy.ndenumerate(mask) if v < ACTOR_BLOCKAGE_FACTOR)
             print('spawning at', i, j)
-            #i, j = self.xy2ij(self.r, self.r)
-            #if mask[i][j] < 1000:
             goals = {}
             while len(goals) == 0:
                 goals = {g: self.g*self.wf for g in range(self.n) if random.random() < self.p}

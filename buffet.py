@@ -141,7 +141,6 @@ class Buffet:
         # if (a.x - g.x)**2 + (a.y - g.y)**2 <= g.r**2:
             a.goals[next_goal] -= 1
             a.loading_left = a.goals[next_goal]
-            print('loading:', next_goal, ':', a.goals[next_goal])
             if a.goals[next_goal] <= 0:
                 a.goals.pop(next_goal)
                 a.reached.append(next_goal)
@@ -169,7 +168,6 @@ class Buffet:
             i_to_matrix[i][j] = i_to
             j_to_matrix[i][j] = j_to
             if i == ai and j == aj:
-                print(distance, i, j, i_to, j_to)
                 break
             visited.add((i, j))
             x, y = self.ij2xy(i, j)
@@ -183,11 +181,7 @@ class Buffet:
         else:
             i, j, i_to, j_to = -1, -1, -1, -1
 
-        if i_to is -1:
-            print('stuck!!! next goal is', next_goal)
-
         if i_to != -1 and j_to != -1 and grid[i_to][j_to] < ACTOR_BLOCKAGE_FACTOR:
-            print('go from', i, j, 'to', i_to, j_to)
             a.x, a.y = self.ij2xy(i_to, j_to)
 
         # Reconstruct the shortest path
@@ -202,7 +196,6 @@ class Buffet:
             mask = self.get_mask(self.active_actors)
             # Find the most top left position that's available
             j, i = min((j, i) for (i, j), v in numpy.ndenumerate(mask) if v < ACTOR_BLOCKAGE_FACTOR)
-            print('spawning at', i, j)
             goals = {}
             while len(goals) == 0:
                 goals = {g: self.g*self.wf for g in range(self.n) if random.random() < self.p}

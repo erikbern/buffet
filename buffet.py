@@ -195,7 +195,7 @@ class Buffet:
         if random.random() < self.rate / self.g:
             mask = self.get_mask(self.active_actors)
             # Find the most top left position that's available
-            ijs = [(i, j), v in numpy.ndenumerate(mask) if v < ACTOR_BLOCKAGE_FACTOR]
+            ijs = [(i, j) for (i, j), v in numpy.ndenumerate(mask) if v < ACTOR_BLOCKAGE_FACTOR]
             if ijs:
                 j, i = min((j, i) for i, j in ijs)
                 goals = {}

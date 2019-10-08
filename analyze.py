@@ -17,7 +17,8 @@ def get_data(fns):
 
 if __name__ == '__main__':
     df = pandas.DataFrame(get_data(sys.argv[1:]), columns=['group', 'created', 'converted', 'now'])
-    print(df)
+    max_T = max(df['now'])
+    df = df[df['created'] >= max_T/3]  # Remove the "burn-in period"
     unit, groups, (G, B, T) = convoys.utils.get_arrays(df)
     convoys.plotting.plot_cohorts(G, B, T, groups=groups)
     pyplot.legend()

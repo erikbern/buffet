@@ -20,7 +20,6 @@ if __name__ == '__main__':
     max_T = max(df['now'])
     df = df[df['created'] >= max_T/3]  # Remove the "burn-in period"
     unit, groups, (G, B, T) = convoys.utils.get_arrays(df)
-    convoys.plotting.plot_cohorts(G, B, T, groups=groups)
+    convoys.plotting.plot_cohorts(G, B, T, groups=groups, ci=0.8)
     pyplot.legend()
-    convoys.plotting.plot_cohorts(G, B, T, model='gamma', plot_kwargs={'ls': ':'})
     pyplot.show()

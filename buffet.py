@@ -195,16 +195,18 @@ class Buffet:
         if random.random() < self.rate / self.g:
             mask = self.get_mask(self.active_actors)
             # Find the most top left position that's available
-            j, i = min((j, i) for (i, j), v in numpy.ndenumerate(mask) if v < ACTOR_BLOCKAGE_FACTOR)
-            goals = {}
-            while len(goals) == 0:
-                goals = {g: self.g*self.wf for g in range(self.n) if random.random() < self.p}
-            goals[self.n] = 1  # sentinel
-            x, y = self.ij2xy(i, j)
-            cls = {'classic': ClassicActor, 'skippable': SkippableActor, 'rogue': RogueActor, 'vline': VLineActor}[self.method]
-            a = cls(self.time, x, y, self.r, goals, random.choice(PEOPLE))
-            self.active_actors.append(a)
-            self.all_actors.append(a)
+            ijs = [(i, j), v in numpy.ndenumerate(mask) if v < ACTOR_BLOCKAGE_FACTOR]
+            if ijs:
+                j, i = min((j, i) for i, j in ijs)
+                goals = {}
+                while len(goals) == 0:
+                    goals = {g: self.g*self.wf for g in range(self.n) if random.random() < self.p}
+                goals[self.n] = 1  # sentinel
+                x, y = self.ij2xy(i, j)
+                cls = {'classic': ClassicActor, 'skippable': SkippableActor, 'rogue': RogueActor, 'vline': VLineActor}[self.method]
+                a = cls(self.time, x, y, self.r, goals, random.choice(PEOPLE))
+                self.active_actors.append(a)
+                self.all_actors.append(a)
 
         # Move each actor
         keep_actors = []

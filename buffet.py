@@ -241,7 +241,7 @@ def draw_frame(buffet, fn, simple):
                 draw.line((a.path[j][0]*up_f, a.path[j][1]*up_f, a.path[j+1][0]*up_f, a.path[j+1][1]*up_f),
                           fill=a.path_color, width=2*down_f)
         font_size = 100
-        font = PIL.ImageFont.truetype('helvetica.ttf', font_size)
+        font = PIL.ImageFont.truetype('pics/helvetica.ttf', font_size)
         draw.text((0, buffet.h*up_f-font_size),
                   'Time: %.1fs Finished: %.0f Rate: %.2f/s' % (buffet.time, buffet.finished, buffet.finished/buffet.time),
                   fill=(0x66, 0x66, 0x66), font=font)

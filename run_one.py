@@ -11,6 +11,7 @@ if __name__ == '__main__':
     parser.add_argument('--simple', action='store_true')  # draw less, for gif
     parser.add_argument('--method', choices=['classic', 'vline', 'rogue', 'skippable'], required=True)
     parser.add_argument('--output', default='buffet.json')
+    parser.add_argument('--draw-dir', default='frames')
     parser.add_argument('--steps', default=1500, type=int)
     # todo: add more arguments
     args = parser.parse_args()
@@ -23,4 +24,4 @@ if __name__ == '__main__':
         with open(args.output, 'w') as f:
             json.dump(data, f)
         if args.draw:
-            pool.apply(draw_frame, (b, 'frames/%06d.png' % step, args.simple))
+            pool.apply(draw_frame, (b, '%s/%06d.png' % (args.draw_dir, step), args.simple))

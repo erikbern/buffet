@@ -62,7 +62,8 @@ class SkippableActor(Actor):
 
 class VLineActor(Actor):
     def dirs(self):
-        return [(0, 0), (1, 0), (0, -1), (-1, 0), (1, -1), (-1, -1)]
+        # return [(0, 0), (1, 0), (0, -1), (-1, 0), (1, -1), (-1, -1)]
+        return [(0, 0), (1, 0), (0, 1), (-1, 0), (0, -1), (1, 1), (1, -1), (-1, -1), (-1, 1)]
 
     def cost_factor(self, x, y, g, di, dj):
         if abs(x - g.x) <= self.r and di == 1 and dj == 0:

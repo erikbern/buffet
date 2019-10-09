@@ -8,7 +8,7 @@ from buffet import Buffet, draw_frame
 
 def run_one(args):
     method, rate = args
-    fn = 'simulations/%s_%f.json' % (method, rate)
+    fn = 'simulations/%s_%.2f.json' % (method, rate)
     if os.path.exists(fn):
         return
 
@@ -23,7 +23,7 @@ def run_one(args):
 
 if __name__ == '__main__':
     methods = ['classic', 'vline', 'rogue', 'skippable']
-    rates = [(z+1)/10 for z in range(15)]
+    rates = [(z+1)/20 for z in range(40)]
     pool = multiprocessing.Pool()
     combinations = list(itertools.product(methods, rates))
     random.shuffle(combinations)

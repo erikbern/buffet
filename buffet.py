@@ -228,9 +228,9 @@ def draw_frame(buffet, fn, simple):
     # Pillow (at least whatever version I have) seems to segfault occasionally
     # That's why we run it inside a pool
     if simple:
-        up_f, down_f = 256, 4
+        up_f, down_f = 128, 4
     else:
-        up_f, down_f = 256, 2
+        up_f, down_f = 256, 4
 
     im = PIL.Image.new('RGBA', (int(buffet.w*up_f), int(buffet.h*up_f)), (255, 255, 255))
     draw = PIL.ImageDraw.Draw(im)

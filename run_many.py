@@ -13,7 +13,7 @@ def run_one(args):
         return
 
     b = Buffet(rate=rate, method=method)
-    for step in range(3000):  # burn in + samples
+    for step in range(1500):  # burn in + samples
         print('###### step %d (%s)' % (step, fn))
         data = b.step()
 

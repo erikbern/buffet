@@ -11,7 +11,7 @@ if __name__ == '__main__':
     parser.add_argument('--simple', action='store_true')  # draw less, for gif
     parser.add_argument('--method', choices=['classic', 'vline', 'rogue', 'skippable'], required=True)
     parser.add_argument('--output', default='buffet.json')
-    parser.add_argument('--steps', default=3000, type=int)
+    parser.add_argument('--steps', default=1500, type=int)
     # todo: add more arguments
     args = parser.parse_args()
 

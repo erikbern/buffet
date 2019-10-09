@@ -80,7 +80,7 @@ class Goal:
 
 
 class Buffet:
-    def __init__(self, n=10, p=0.4, g=10, r=0.18, gr=0.24, h=4, wf=2, nw=4.5, rate=1.0, method='anarchy'):
+    def __init__(self, n=10, p=0.4, g=10, r=0.18, gr=0.24, h=6, wf=2, nw=4.5, rate=1.0, method='anarchy'):
         self.n = n   # Number of items on buffet
         self.p = p   # Probability of wanting each item
         self.g = g   # Granularity of grid

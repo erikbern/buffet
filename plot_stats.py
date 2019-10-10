@@ -6,7 +6,7 @@ import pandas
 import sys
 
 
-def get_data(fns, p=90):
+def get_data(fns, p=80):
     for fn in fns:
         with open(fn, 'r') as f:
             data = json.load(f)
@@ -25,6 +25,8 @@ def get_data(fns, p=90):
         average_t = numpy.trapz(t, y)
         percentile_t = numpy.interp(p/100, y, t)
         # throughput = df['created'].count() / (max_T * 2/3)
+
+        print(data['method'], data['rate'], throughput, percentile_t)
         yield (data['method'], data['rate'], throughput, percentile_t)
 
 

@@ -27,7 +27,7 @@ class Actor:
         self.emoji = emoji
         self.loading_left = None
         self.path = []
-        self.path_color = tuple(0xe0 + int(0x20*random.random()) for z in range(3))
+        self.path_color = tuple(0xc0 + int(0x40*random.random()) for z in range(3))
         self.reached = []
 
 
@@ -229,7 +229,7 @@ def draw_frame(buffet, fn, simple):
     # Pillow (at least whatever version I have) seems to segfault occasionally
     # That's why we run it inside a pool
     if simple:
-        up_f, down_f = 128, 4
+        up_f, down_f = 192, 4
     else:
         up_f, down_f = 256, 4
 
@@ -243,8 +243,8 @@ def draw_frame(buffet, fn, simple):
                           fill=a.path_color, width=2*down_f)
         font_size = 100
         font = PIL.ImageFont.truetype('pics/helvetica.ttf', font_size)
-        draw.text((0, buffet.h*up_f-font_size),
-                  'Time: %.1fs Finished: %.0f Rate: %.2f/s' % (buffet.time, buffet.finished, buffet.finished/buffet.time),
+        draw.text((0, 0),
+                  'Time: %.1fs\nFinished: %.0f\nRate: %.2f/s' % (buffet.time, buffet.finished, buffet.finished/buffet.time),
                   fill=(0x66, 0x66, 0x66), font=font)
     for g in buffet.goals:
         if g.emoji:

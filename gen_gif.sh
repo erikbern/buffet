@@ -1,1 +1,1 @@
-convert -delay 1 -layers Optimize frames/??????.png animation.gif
+convert -delay 1 -layers Optimize $1/??????.png $2

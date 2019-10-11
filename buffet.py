@@ -243,9 +243,10 @@ def draw_frame(buffet, fn, simple):
                           fill=a.path_color, width=2*down_f)
         font_size = 100
         font = PIL.ImageFont.truetype('pics/helvetica.ttf', font_size)
-        draw.text((0, 0),
-                  'Time: %.1fs\nFinished: %.0f\nRate: %.2f/s' % (buffet.time, buffet.finished, buffet.finished/buffet.time),
-                  fill=(0x66, 0x66, 0x66), font=font)
+        rows = ['Time: %.1fs' % buffet.time, 'Finished: %.0f' % buffet.finished, 'Rate: %.2f/s' % (buffet.finished/buffet.time)]
+        for i, row in enumerate(rows):
+            draw.text((0, buffet.h*up_f-font_size*(len(rows)-i)),
+                      row, fill=(0x66, 0x66, 0x66), font=font)
     for g in buffet.goals:
         if g.emoji:
             emoji = PIL.Image.open(g.emoji)
@@ -260,10 +261,6 @@ def draw_frame(buffet, fn, simple):
         plate = PIL.Image.open('pics/plate.png')
         minis = [('pics/plate.png', -buffet.r, 0)] + [(buffet.goals[r].emoji, -buffet.r, 0) for r in a.reached]
         if a.loading_left:
-            #draw.arc(((a.x - buffet.r)*up_f, (a.y - buffet.r)*up_f,
-            #          (a.x + buffet.r)*up_f, (a.y + buffet.r)*up_f),
-            #         start=0, end=360*a.loading_left/(buffet.g*buffet.wf),
-            #         fill=(0, 0, 0), width=2*down_f)
             frac = a.loading_left / (buffet.g*buffet.wf)
             path = buffet.goals[min(a.goals.keys())].emoji
             minis.append(((path, -buffet.r*(1-frac), -buffet.r*frac)))

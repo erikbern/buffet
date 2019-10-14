@@ -21,6 +21,10 @@ def get_data(fns, p=80):
         df = pandas.DataFrame(data['data'], columns=['created', 'converted', 'now'])
         max_T = max(df['now'])
 
+        in_queue = df['created'].count() - df['converted'].count()
+        # Use little's law to infer the cycle time
+        littles_latency = in_queue / data['rate']
+
         df = df[df['created'] >= max_T/3]  # Remove the "burn-in period"
         df['group'] = None
         unit, groups, (G, B, T) = convoys.utils.get_arrays(df)
@@ -29,15 +33,19 @@ def get_data(fns, p=80):
         t = numpy.linspace(0, max(T), 1000, endpoint=False)
         y = km.cdf(t)
         t, y = numpy.append(t, [SENTINEL]), numpy.append(y, [1.0])  # Add sentinel
-        average_t = numpy.trapz(t, y)
-        percentile_t = numpy.interp(p/100, y, t)
+        # average_t = numpy.trapz(t, y)
+        percentile_latency = numpy.interp(p/100, y, t)
 
-        print(data['method'], data['rate'], percentile_t)
-        yield (data['method'], data['rate'], percentile_t)
+        print(data['method'], data['rate'], littles_latency, percentile_latency)
+        yield (data['method'], data['rate'], littles_latency, percentile_latency)
 
 
 if __name__ == '__main__':
-    df = pandas.DataFrame(get_data(sys.argv[1:]), columns=['method', 'rate', 'latency'])
+    df = pandas.DataFrame(get_data(sys.argv[1:]), columns=['method', 'rate', 'latency', 'latency2'])
+    df.plot.scatter('latency', 'latency2')
+    pyplot.ylim([0, 100])
+    pyplot.show()
+
     max_latency = max(t for t in df['latency'] if t < SENTINEL * 0.01)
     y_max = max_latency*1.25
     df['latency_capped'] = df['latency'].apply(lambda z: y_max if z >= y_max else SENTINEL)
@@ -50,6 +58,8 @@ if __name__ == '__main__':
             delta = 3
             pyplot.annotate('', xy=(x, y-delta), xytext=(x, y+delta), annotation_clip=False,
                             arrowprops=dict(color=color, arrowstyle='<-', lw=2))
+
+        continue
 
         xy = [(x, y) for x, y in zip(df_m['rate'].values, df_m['latency'].values)]  # if y < SENTINEL * 0.01]
         max_x = max(x for x, y in xy if y < SENTINEL * 0.01)
